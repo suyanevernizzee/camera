@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Binotto — Painel de Discos de Tacógrafo</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div class="hdr-top">
+    <div class="logo-wrap">
+      <div class="logo-icon">B</div>
+      <div>
+        <div class="logo-text">BINOTTO<span class="logo-dot">.</span></div>
+        <div class="logo-sub">Painel de Discos de Tacógrafo</div>
+      </div>
+    </div>
+    <div class="hdr-right">
+      <span class="file-badge" id="fileInfo">Nenhum arquivo carregado</span>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
+        <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      </button>
+      <button class="btn-upload" onclick="document.getElementById('fileInput').click()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Carregar planilha
+      </button>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="loadFile(this)">
+    </div>
+  </div>
+  <div class="hdr-tabs" id="hdrTabs">
+    <div class="tab active" onclick="switchTab('mensal')">📋 Mensal Discos</div>
+    <div class="tab" onclick="switchTab('discos')">💿 Discos</div>
+    <div class="tab" onclick="switchTab('vdo')">📟 Leitura VDO</div>
+  </div>
+</header>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-title" id="modalTitle"></div>
+    <div class="modal-metrics" id="modalMetrics"></div>
+    <div class="table-wrap table-scroll"><table class="modal-table"><thead id="modalThead"></thead><tbody id="modalTbody"></tbody></table></div>
+  </div>
+</div>
+
+<main class="main">
+
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <div class="drop-icon">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
+    </div>
+    <div class="drop-title">Arraste sua planilha aqui</div>
+    <div class="drop-sub">ou clique para selecionar o arquivo</div>
+    <div class="drop-abas">
+      <span class="drop-aba">📋 MENSAL DISCOS</span>
+      <span class="drop-aba">💿 Discos</span>
+      <span class="drop-aba">📟 Leitura VDO</span>
+    </div>
+  </div>
+
+  <div id="dashboard">
+
+    <!-- ===== MENSAL DISCOS ===== -->
+    <div class="tab-panel active" id="tab-mensal">
+      <div class="slabel">Filtros</div>
+      <div class="controls controls-fit">
+        <!-- Calendário de período -->
+        <div class="cg cg-periodo">
+          <label>Período</label>
+          <div class="cal-wrap" id="mCalWrap">
+            <button class="cal-trigger" id="mCalTrigger" type="button">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <span id="mCalLabel">Selecione o período</span>
+            </button>
+            <div class="cal-popup" id="mCalPopup">
+              <div class="cal-months">
+                <div class="cal-month" id="mCal1"></div>
+                <div class="cal-month" id="mCal2"></div>
+              </div>
+              <div class="cal-footer">
+                <span class="cal-hint" id="mCalHint">nenhum período selecionado</span>
+                <div style="display:flex;gap:8px">
+                  <button class="cal-btn-cancel" id="mCalCancel" type="button">Cancelar</button>
+                  <button class="cal-btn-apply" id="mCalApply" type="button">Aplicar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <input type="date" id="mDateIni" style="display:none">
+          <input type="date" id="mDateFim" style="display:none">
+        </div>
+        <div class="cg cg-ano"><label>Ano</label><select id="mSelAno" onchange="applyMensal('ano')"><option value="">Todos</option></select></div>
+        <div class="cg cg-mes"><label>Mês</label><select id="mSelMes" onchange="applyMensal('mes')"><option value="">Todos</option></select></div>
+        <div class="cg"><label>Contrato</label><select id="mSelCon" onchange="applyMensal()"><option value="">Todos</option></select></div>
+        <div class="cg"><label>Unidade</label>
+          <select id="mSelUnidade" onchange="applyMensal()">
+            <option value="">Todas</option>
+            <option value="sudeste">Sudeste SP</option>
+            <option value="sul">Sul PR/SC</option>
+          </select></div>
+        <div class="cg"><label>Motorista</label><select id="mSelMot" onchange="applyMensal()"><option value="">Todos</option></select></div>
+        <div class="cg"><label>Placa</label><input type="text" id="mSelPlaca" placeholder="ex: ABC1234" oninput="applyMensal()"></div>
+        <button class="btn-reset" onclick="resetMensal()" style="margin-top:18px">↺ Limpar</button>
+      </div>
+
+      <div class="slabel">Indicadores — clique para detalhar</div>
+      <div class="kpi-grid" id="mKpiGrid"></div>
+      <div id="mKpiDetail"></div>
+
+      <div class="export-bar">
+        <button class="btn-export" onclick="exportCSV(mensalFilt,'mensal_discos.csv',['Mês','Motorista','Placa','Contrato','Filial','1ª Quin','2ª Quin','Meta','Pendência','Status','Picos 1ª','Picos 2ª','Total Picos','Obs'])">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>CSV</button>
+        <button class="btn-export" onclick="exportXLSX(mensalFilt,'mensal_discos.xlsx','Mensal Discos',['Mês','Motorista','Placa','Contrato','Filial','1ª Quin','2ª Quin','Meta','Pendência','Status','Picos 1ª','Picos 2ª','Total Picos','Obs'])">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>XLSX</button>
+      </div>
+
+      <div id="mChartsArea">
+        <div class="slabel">Evolução mensal</div>
+        <div class="card" style="margin-bottom:1.1rem">
+          <div class="card-title">1ª e 2ª quinzena — discos entregues vs meta <span style="font-size:10px;color:var(--tx3);font-weight:400">(clique para detalhar)</span></div>
+          <div class="chart-clickable" style="position:relative;height:260px"><canvas id="mCMensal"></canvas></div>
+        </div>
+        <div class="slabel">Distribuição</div>
+        <div class="g2">
+          <div class="card">
+            <div class="card-title">Top 15 motoristas — Discos entregues</div>
+            <div class="chart-clickable" style="position:relative;height:340px"><canvas id="mCMotoristas"></canvas></div>
+          </div>
+          <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <div class="card-title" style="width:100%;text-align:center">Status de entrega</div>
+            <div class="chart-clickable" style="position:relative;height:300px;width:300px;margin:0 auto"><canvas id="mCStatus"></canvas></div>
+            <div class="legend" id="mLgStatus" style="margin-top:14px;justify-content:center;text-align:center"></div>
+          </div>
+        </div>
+        <div class="g3">
+          <div class="card" style="display:flex;flex-direction:column;align-items:center">
+            <div class="card-title" style="width:100%">Por contrato</div>
+            <div class="chart-clickable" style="position:relative;height:190px;width:190px"><canvas id="mCContrato"></canvas></div>
+            <div class="legend" id="mLgContrato" style="margin-top:8px;justify-content:center"></div>
+          </div>
+          <div class="card" style="display:flex;flex-direction:column;align-items:center">
+            <div class="card-title" style="width:100%">Por filial</div>
+            <div class="chart-clickable" style="position:relative;height:190px;width:190px"><canvas id="mCFilial"></canvas></div>
+            <div class="legend" id="mLgFilial" style="margin-top:8px;justify-content:center"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Picos por mês</div>
+            <div class="chart-clickable" style="position:relative;height:190px"><canvas id="mCPicos"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="slabel">Registros</div>
+      <div class="table-section">
+        <div class="table-hdr">
+          <div style="display:flex;align-items:center;gap:10px"><span class="table-title">Mensal Discos</span><span class="table-count" id="mCount">0</span></div>
+          <input class="table-search" id="mTableSearch" placeholder="🔍  Buscar motorista, placa..." oninput="applyMensal()">
+        </div>
+        <div class="table-wrap"><table class="mtbl">
+          <colgroup>
+            <col style="width:6%"><col style="width:13%"><col style="width:6%"><col style="width:6%">
+            <col style="width:5%"><col style="width:4%"><col style="width:4%"><col style="width:4%">
+            <col style="width:5%"><col style="width:11%"><col style="width:11%"><col style="width:5%"><col style="width:20%">
+          </colgroup>
+          <thead><tr>
+            <th onclick="mSort('mes')">Mês</th><th onclick="mSort('motorista')">Motorista</th>
+            <th onclick="mSort('placa')">Placa</th><th onclick="mSort('contrato')">Contrato</th>
+            <th onclick="mSort('filial')">Filial</th><th onclick="mSort('quin1')">1ª Quin</th>
+            <th onclick="mSort('quin2')">2ª Quin</th><th onclick="mSort('meta')">Meta</th>
+            <th onclick="mSort('pendencia')">Pendência</th><th onclick="mSort('statusPend')">Status 1ª</th>
+            <th onclick="mSort('statusPend')">Status 2ª</th><th onclick="mSort('totalPicos')">Picos</th>
+            <th onclick="mSort('obs')">Obs</th>
+          </tr></thead>
+          <tbody id="mTbody"></tbody>
+        </table></div>
+        <div class="pagination" id="mPag"></div>
+      </div>
+    </div>
+
+    <!-- ===== DISCOS ===== -->
+    <div class="tab-panel" id="tab-discos">
+      <div class="slabel">Filtros</div>
+      <div class="controls controls-fit">
+        <div class="cg cg-date"><label>Data início</label><input type="date" id="dDateIni" onchange="applyDiscos('periodo')"></div>
+        <div class="cg cg-date"><label>Data fim</label><input type="date" id="dDateFim" onchange="applyDiscos('periodo')"></div>
+        <div class="cg"><label>Mês</label><select id="dSelMes" onchange="applyDiscos('mes')"><option value="">Todos</option></select></div>
+        <div class="cg"><label>Contrato</label><select id="dSelCon" onchange="applyDiscos()"><option value="">Todos</option></select></div>
+        <div class="cg"><label>Quinzena</label>
+          <select id="dSelQuin" onchange="applyDiscos()">
+            <option value="">Todas</option><option value="1">1ª Quinzena</option><option value="2">2ª Quinzena</option>
+          </select></div>
+        <div class="cg"><label>Resultado</label>
+          <select id="dSelObs" onchange="applyDiscos()">
+            <option value="">Todos</option><option value="EXCESSO">Com excesso</option>
+            <option value="CONFORME">Conforme</option><option value="FILIAL">Entregue filial</option>
+          </select></div>
+        <div class="cg"><label>Motorista</label><select id="dSelMot" onchange="applyDiscos()"><option value="">Todos</option></select></div>
+        <div class="cg"><label>Placa</label><input type="text" id="dSelPlaca" placeholder="ex: ABC1234" oninput="applyDiscos()"></div>
+        <button class="btn-reset" onclick="resetDiscos()">↺ Limpar</button>
+      </div>
+
+      <div class="slabel">Indicadores — clique para detalhar</div>
+      <div class="kpi-grid" id="dKpiGrid"></div>
+      <div id="dKpiDetail"></div>
+
+      <div class="export-bar">
+        <button class="btn-export" onclick="exportCSV(discosFilt,'discos.csv',['Motorista','Placa','Contrato','Mês','Quinzena','Data Inicial','Data Final','Filial','Qtde Picos','Data Recebimento','Observação'])">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>CSV</button>
+        <button class="btn-export" onclick="exportXLSX(discosFilt,'discos.xlsx','Discos',['Motorista','Placa','Contrato','Mês','Quinzena','Data Inicial','Data Final','Filial','Qtde Picos','Data Recebimento','Observação'])">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>XLSX</button>
+      </div>
+
+      <div id="dChartsArea">
+        <div class="slabel">Evolução mensal</div>
+        <div class="card" style="margin-bottom:1.1rem">
+          <div class="card-title">1ª e 2ª quinzena — discos analisados vs picos <span style="font-size:10px;color:var(--tx3);font-weight:400">(clique para detalhar)</span></div>
+          <div class="chart-clickable" style="position:relative;height:260px"><canvas id="dCMensal"></canvas></div>
+        </div>
+        <div class="slabel">Distribuição</div>
+        <div class="g2">
+          <div class="card"><div class="card-title">Top 15 motoristas — Picos acumulados</div>
+            <div class="chart-clickable" style="position:relative;height:340px"><canvas id="dCTop"></canvas></div></div>
+          <div class="card" style="display:flex;flex-direction:column;align-items:center">
+            <div class="card-title" style="width:100%">Resultado dos discos</div>
+            <div class="chart-clickable" style="position:relative;height:230px;width:230px"><canvas id="dCObs"></canvas></div>
+            <div class="legend" id="dLgObs" style="margin-top:10px;justify-content:center"></div>
+          </div>
+        </div>
+        <div class="g3">
+          <div class="card" style="display:flex;flex-direction:column;align-items:center">
+            <div class="card-title" style="width:100%">Por contrato</div>
+            <div class="chart-clickable" style="position:relative;height:190px;width:190px"><canvas id="dCContrato"></canvas></div>
+            <div class="legend" id="dLgContrato" style="margin-top:8px;justify-content:center"></div>
+          </div>
+          <div class="card" style="display:flex;flex-direction:column;align-items:center">
+            <div class="card-title" style="width:100%">Por filial</div>
+            <div class="chart-clickable" style="position:relative;height:190px;width:190px"><canvas id="dCFilial"></canvas></div>
+            <div class="legend" id="dLgFilial" style="margin-top:8px;justify-content:center"></div>
+          </div>
+          <div class="card"><div class="card-title">1ª vs 2ª quinzena por mês</div>
+            <div class="chart-clickable" style="position:relative;height:190px"><canvas id="dCQuin"></canvas></div></div>
+        </div>
+      </div>
+
+      <div class="slabel">Registros</div>
+      <div class="table-section">
+        <div class="table-hdr">
+          <div style="display:flex;align-items:center;gap:10px"><span class="table-title">Discos</span><span class="table-count" id="dCount">0</span></div>
+          <input class="table-search" id="dTableSearch" placeholder="🔍  Buscar motorista, placa, obs..." oninput="applyDiscos()">
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th onclick="dSort('motorista')">Motorista</th><th onclick="dSort('placa')">Placa</th>
+            <th onclick="dSort('contrato')">Contrato</th><th onclick="dSort('mes')">Mês</th>
+            <th onclick="dSort('quinzena')">Quin</th><th onclick="dSort('dataInicial')">Data Inicial</th>
+            <th onclick="dSort('dataFinal')">Data Final</th><th onclick="dSort('filial')">Filial</th>
+            <th onclick="dSort('picos')">Picos</th><th onclick="dSort('dataReceb')">Recebimento</th>
+            <th onclick="dSort('obs')">Observação</th>
+          </tr></thead>
+          <tbody id="dTbody"></tbody>
+        </table></div>
+        <div class="pagination" id="dPag"></div>
+      </div>
+    </div>
+
+    <!-- ===== LEITURA VDO ===== -->
+    <div class="tab-panel" id="tab-vdo">
+      <div class="slabel">Filtros</div>
+      <div class="controls controls-fit">
+        <div class="cg cg-date"><label>Data início</label><input type="date" id="vDateIni" onchange="applyVdo('periodo')"></div>
+        <div class="cg cg-date"><label>Data fim</label><input type="date" id="vDateFim" onchange="applyVdo('periodo')"></div>
+        <div class="cg"><label>Mês</label><select id="vSelMes" onchange="applyVdo('mes')"><option value="">Todos</option></select></div>
+        <div class="cg"><label>Contrato</label><select id="vSelCon" onchange="applyVdo()"><option value="">Todos</option></select></div>
+        <div class="cg"><label>Quinzena</label>
+          <select id="vSelQuin" onchange="applyVdo()">
+            <option value="">Todas</option><option value="1">1ª Quinzena</option><option value="2">2ª Quinzena</option>
+          </select></div>
+        <div class="cg"><label>Com picos</label>
+          <select id="vSelPicos" onchange="applyVdo()">
+            <option value="">Todos</option><option value="sim">Com picos (> 0)</option><option value="nao">Sem picos (= 0)</option>
+          </select></div>
+        <div class="cg"><label>Motorista</label><select id="vSelMot" onchange="applyVdo()"><option value="">Todos</option></select></div>
+        <div class="cg"><label>Placa</label><input type="text" id="vSelPlaca" placeholder="ex: ABC1234" oninput="applyVdo()"></div>
+        <button class="btn-reset" onclick="resetVdo()">↺ Limpar</button>
+      </div>
+
+      <div class="slabel">Indicadores — clique para detalhar</div>
+      <div class="kpi-grid" id="vKpiGrid"></div>
+      <div id="vKpiDetail"></div>
+
+      <div class="export-bar">
+        <button class="btn-export" onclick="exportCSV(vdoFilt,'leitura_vdo.csv',['Motorista','Placa','Contrato','Mês','Quinzena','Data Inicial','Data Final','Filial','Qtde Picos','Observação'])">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>CSV</button>
+        <button class="btn-export" onclick="exportXLSX(vdoFilt,'leitura_vdo.xlsx','Leitura VDO',['Motorista','Placa','Contrato','Mês','Quinzena','Data Inicial','Data Final','Filial','Qtde Picos','Observação'])">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>XLSX</button>
+      </div>
+
+      <div id="vChartsArea">
+        <div class="slabel">Evolução mensal</div>
+        <div class="card" style="margin-bottom:1.1rem">
+          <div class="card-title">1ª e 2ª quinzena — leituras VDO vs picos <span style="font-size:10px;color:var(--tx3);font-weight:400">(clique para detalhar)</span></div>
+          <div class="chart-clickable" style="position:relative;height:260px"><canvas id="vCMensal"></canvas></div>
+        </div>
+        <div class="slabel">Distribuição</div>
+        <div class="g2">
+          <div class="card"><div class="card-title">Top 15 motoristas — Picos acumulados</div>
+            <div class="chart-clickable" style="position:relative;height:340px"><canvas id="vCTop"></canvas></div></div>
+          <div class="card" style="display:flex;flex-direction:column;align-items:center">
+            <div class="card-title" style="width:100%">Com picos vs sem picos</div>
+            <div class="chart-clickable" style="position:relative;height:230px;width:230px"><canvas id="vCDonut"></canvas></div>
+            <div class="legend" id="vLgDonut" style="margin-top:10px;justify-content:center"></div>
+          </div>
+        </div>
+        <div class="g3">
+          <div class="card" style="display:flex;flex-direction:column;align-items:center">
+            <div class="card-title" style="width:100%">Por filial</div>
+            <div class="chart-clickable" style="position:relative;height:190px;width:190px"><canvas id="vCFilial"></canvas></div>
+            <div class="legend" id="vLgFilial" style="margin-top:8px;justify-content:center"></div>
+          </div>
+          <div class="card"><div class="card-title">1ª vs 2ª quinzena por mês</div>
+            <div class="chart-clickable" style="position:relative;height:190px"><canvas id="vCQuin"></canvas></div></div>
+          <div class="card"><div class="card-title">Placas com mais picos</div>
+            <div class="chart-clickable" style="position:relative;height:190px"><canvas id="vCPlacas"></canvas></div></div>
+        </div>
+      </div>
+
+      <div class="slabel">Registros</div>
+      <div class="table-section">
+        <div class="table-hdr">
+          <div style="display:flex;align-items:center;gap:10px"><span class="table-title">Leitura VDO</span><span class="table-count" id="vCount">0</span></div>
+          <input class="table-search" id="vTableSearch" placeholder="🔍  Buscar motorista, placa, obs..." oninput="applyVdo()">
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th onclick="vSort('motorista')">Motorista</th><th onclick="vSort('placa')">Placa</th>
+            <th onclick="vSort('contrato')">Contrato</th><th onclick="vSort('mes')">Mês</th>
+            <th onclick="vSort('quinzena')">Quin</th><th onclick="vSort('dataInicial')">Data Inicial</th>
+            <th onclick="vSort('dataFinal')">Data Final</th><th onclick="vSort('filial')">Filial</th>
+            <th onclick="vSort('picos')">Picos</th><th onclick="vSort('obs')">Observação</th>
+          </tr></thead>
+          <tbody id="vTbody"></tbody>
+        </table></div>
+        <div class="pagination" id="vPag"></div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<footer>Binotto Transportes &mdash; Painel de Discos de Tacógrafo &mdash; Desenvolvido com Claude AI</footer>
+<script src="app.js"></script>
+</body>
+</html>
